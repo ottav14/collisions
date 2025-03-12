@@ -1,9 +1,11 @@
 :root {
-
+	--text: #fff;
 }
 
 * {
 	margin: 0;	
+	color: var(--text);
+	font-size: 16pt;
 }
 
 canvas {
@@ -12,9 +14,14 @@ canvas {
 
 #app {
 	display: flex;
+	flex-direction: column;
 	justify-content: center;
 	align-items: center;
 	width: 100vw;
 	height: 100vh;
 	background-color: #000;
+}
+
+#energy {
+	margin-top: 2rem;
 }
