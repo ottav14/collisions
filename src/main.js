@@ -1,15 +1,16 @@
 import './style.css';
 import * as LA from './la.js';
 import { hue, clamp } from './util.js';
+import { Point } from './Point.js';
 
 let canvasWidth = 500;
 let canvasHeight = 500;
-const circleCount = 2;
+const circleCount = 5;
 const eulerIterations = 1;
 const spawnAttempts = 500;
 const circleSizeFactor = 30;
 const mass = 1;
-const g = 0.3;
+const g = 0.0;
 const drag = 0.05;
 const maxVelocity = 10;
 const initialVelocity = maxVelocity;
@@ -17,7 +18,7 @@ const energyLoss = 0.05;
 const backgroundColor = '#000'
 const friction = 0.02;
 const timestep = 0.02;
-const debug = false;
+const debug = true;
 
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext("2d");
@@ -30,16 +31,19 @@ const createCircles = () => {
 		const radius = mass * circleSizeFactor;
 
 		const cpr = 10;
-		const position = {
-			x: (i%cpr)*3*radius + 3*radius,
-			y: Math.floor(i/cpr)*radius*3 + 3*radius
-		}
+		const position = new Point(
+			(i%cpr)*3*radius + 3*radius,
+			Math.floor(i/cpr)*radius*3 + 3*radius
+		);
+
+		const velocity = new Point(
+			Math.floor(Math.random()*initialVelocity),
+			Math.floor(Math.random()*initialVelocity)
+		)
 
 		newCircles.push({
-			x: position.x,
-			y: position.y,
-			vx: Math.floor(Math.random()*initialVelocity),
-			vy: Math.floor(Math.random()*initialVelocity),
+			pos: position,
+			vel: velocity,
 			m: mass,
 			r: Math.sqrt(mass) * circleSizeFactor
 		});
@@ -54,10 +58,7 @@ let energy = 0;
 const updateEnergyDisplay = () => {
 	let totalEnergy = 0;
 	for(const c of circles) {
-		const v = LA.magnitude({
-			x: c.vx,
-			y: c.vy,
-		});
+		const v = LA.magnitude(c.vel);
 		totalEnergy += 0.5 * mass * v * v;
 	}
 	energyDisplay.textContent = `Energy: ${totalEnergy}`;
@@ -68,7 +69,7 @@ const updateEnergyDisplay = () => {
 const drawCircle = (c) => {
 	ctx.beginPath();
 	ctx.fillStyle = '#00f';
-	ctx.arc(c.x, c.y, c.r, 0, Math.PI * 2); 
+	ctx.arc(c.pos.x, c.pos.y, c.r, 0, Math.PI * 2); 
 	ctx.fill();
 }
 
@@ -80,23 +81,21 @@ const drawLine = (x1, y1, x2, y2) => {
 }
 
 const step = (c, t) => {
-	c.vy += t*t*g;
-	c.x += t*c.vx;
-	c.y += t*c.vy;
+	c.vel.y += t*t*g;
+	c.pos = LA.add(c.pos, LA.mult(t, c.vel));
 }
 
 const undoStep = (c, t) => {
-	c.vy -= t*t*g;
-	c.x -= t*c.vx;
-	c.y -= t*c.vy;
+	c.vel.y -= t*t*g;
+	c.pos = LA.sub(c.pos, LA.mult(t, c.vel));
 }
 
 const handleCollision = (c1, c2) => {
 
-	const v1 = { x: c1.vx, y: c1.vy };
-	const v2 = { x: c2.vx, y: c2.vy };
+	const v1 = c1.vel;
+	const v2 = c2.vel;
 	const n = LA.normalize(LA.sub(v2, v1));
-	const t = { x: n.y, y: -n.x };
+	const t = new Point(n.y, -n.x);
 	
 	const vn1 = LA.dot(v1, n);
 	const vt1 = LA.dot(v1, t);
@@ -106,10 +105,8 @@ const handleCollision = (c1, c2) => {
 	const v1d = (1-energyLoss) * ((c1.m-c2.m) * vn1 + 2*c2.m*vn2) / (c1.m+c2.m);
 	const v2d = (1-energyLoss) * ((c2.m-c1.m) * vn2 + 2*c1.m*vn1) / (c1.m+c2.m);
 
-	c1.vx = v1d * n.x + vt1 * t.x;
-	c1.vy = v1d * n.y + vt1 * t.y;
-	c2.vx = v2d * n.x + vt2 * t.x;
-	c2.vy = v2d * n.y + vt2 * t.y;
+	c1.vel = LA.add(LA.mult(v1d, n), LA.mult(vt1, t));
+	c2.vel = LA.add(LA.mult(v2d, n), LA.mult(vt2, t));
 
 }
 
@@ -119,7 +116,7 @@ const checkCollisions = (i, t) => {
 	const s = 1/eulerIterations;
 	for(let j=0; j<circles.length; j++) {
 		const c2 = circles[j];
-		if(i !== j && LA.distance(c1, c2) < c1.r+c2.r) {
+		if(i !== j && LA.distance(c1.pos, c2.pos) < c1.r+c2.r) {
 			undoStep(c1, s);
 			undoStep(c2, s);
 			handleCollision(c1, c2);
@@ -128,24 +125,24 @@ const checkCollisions = (i, t) => {
 		}
 	}
 
-	if(c1.x + c1.r > canvasWidth) {
-		c1.x = canvasWidth - c1.r;
-		c1.vx *= -1+friction;
+	if(c1.pos.x + c1.r > canvasWidth) {
+		c1.pos.x = canvasWidth - c1.r;
+		c1.vel.x *= -1+friction;
 		step(c1, s);
 	}
-	if(c1.x - c1.r < 0) {
-		c1.x = c1.r;
-		c1.vx *= -1+friction;
+	if(c1.pos.x - c1.r < 0) {
+		c1.pos.x = c1.r;
+		c1.vel.x *= -1+friction;
 		step(c1, s);
 	}
-	if(c1.y + c1.r > canvasHeight) {
-		c1.y = canvasHeight - c1.r;
-		c1.vy *= -1+friction;
+	if(c1.pos.y + c1.r > canvasHeight) {
+		c1.pos.y = canvasHeight - c1.r;
+		c1.vel.y *= -1+friction;
 		step(c1, s);
 	}
-	if(c1.y - c1.r < 0) {
-		c1.y = c1.r;
-		c1.vy *= -1+friction;
+	if(c1.pos.y - c1.r < 0) {
+		c1.pos.y = c1.r;
+		c1.vel.y *= -1+friction;
 		step(c1, s);
 	}
 	 
@@ -161,14 +158,14 @@ const drawLoop = () => {
 	
 	if(debug) {
 		for(const c of circles) {
-			const n = LA.normalize({ x: c.vx, y: c.vy });
-			const t = { x: n.y, y: -n.x };
+			const n = LA.normalize(c.vel);
+			const t = new Point(n.y, -n.x);
 			const factor = 20;
-			const speed = LA.magnitude({ x: c.vx, y: c.vy });
+			const speed = LA.magnitude(c.vel);
 			ctx.strokeStyle = '#00f';
-			drawLine(c.x, c.y, c.x + factor * speed * n.x, c.y + factor * speed * n.y);
+			drawLine(c.pos.x, c.pos.y, c.pos.x + factor * speed * n.x, c.pos.y + factor * speed * n.y);
 			ctx.strokeStyle = '#f00';
-			drawLine(c.x, c.y, c.x + factor * 3 * t.x, c.y + factor * 3 * t.y);
+			drawLine(c.pos.x, c.pos.y, c.pos.x + factor * 3 * t.x, c.pos.y + factor * 3 * t.y);
 
 		}
 	}
@@ -195,4 +192,5 @@ const interval = setInterval(() => {
 
 	drawLoop();
 }, 1000*timestep);
+
 
