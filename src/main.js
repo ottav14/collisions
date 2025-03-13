@@ -2,20 +2,20 @@ import './style.css';
 import * as LA from './la.js';
 import { hue, clamp } from './util.js';
 
-const canvasWidth = 1000;
-const canvasHeight = 800;
-const circleCount = 80;
-const eulerIterations = 4;
+let canvasWidth = 500;
+let canvasHeight = 500;
+const circleCount = 2;
+const eulerIterations = 1;
 const spawnAttempts = 500;
 const circleSizeFactor = 30;
 const mass = 1;
-const g = 0.0;
+const g = 0.3;
 const drag = 0.05;
-const maxVelocity = 9;
-const initialVelocity = 9;
-const energyLoss = 0.3;
+const maxVelocity = 10;
+const initialVelocity = maxVelocity;
+const energyLoss = 0.05;
 const backgroundColor = '#000'
-const friction = 0.00;
+const friction = 0.02;
 const timestep = 0.02;
 const debug = false;
 
@@ -23,7 +23,6 @@ const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext("2d");
 canvas.width = canvasWidth;
 canvas.height = canvasHeight;
-
 
 const createCircles = () => {
 	const newCircles = [];
@@ -92,7 +91,7 @@ const undoStep = (c, t) => {
 	c.y -= t*c.vy;
 }
 
-const handleCollision2 = (c1, c2) => {
+const handleCollision = (c1, c2) => {
 
 	const v1 = { x: c1.vx, y: c1.vy };
 	const v2 = { x: c2.vx, y: c2.vy };
@@ -104,8 +103,8 @@ const handleCollision2 = (c1, c2) => {
 	const vn2 = LA.dot(v2, n);
 	const vt2 = LA.dot(v2, t);
 
-	const v1d = ((c1.m-c2.m) * vn1 + 2*c2.m*vn2) / (c1.m+c2.m);
-	const v2d = ((c2.m-c1.m) * vn2 + 2*c1.m*vn1) / (c1.m+c2.m);
+	const v1d = (1-energyLoss) * ((c1.m-c2.m) * vn1 + 2*c2.m*vn2) / (c1.m+c2.m);
+	const v2d = (1-energyLoss) * ((c2.m-c1.m) * vn2 + 2*c1.m*vn1) / (c1.m+c2.m);
 
 	c1.vx = v1d * n.x + vt1 * t.x;
 	c1.vy = v1d * n.y + vt1 * t.y;
@@ -123,19 +122,29 @@ const checkCollisions = (i, t) => {
 		if(i !== j && LA.distance(c1, c2) < c1.r+c2.r) {
 			undoStep(c1, s);
 			undoStep(c2, s);
-			handleCollision2(c1, c2);
+			handleCollision(c1, c2);
 			step(c1, s);
 			step(c2, s);
 		}
 	}
 
-	if(c1.x + c1.r > canvasWidth || c1.x - c1.r < 0) {
-		undoStep(c1, s);
+	if(c1.x + c1.r > canvasWidth) {
+		c1.x = canvasWidth - c1.r;
 		c1.vx *= -1+friction;
 		step(c1, s);
 	}
-	if(c1.y + c1.r > canvasHeight || c1.y - c1.r < 0) {
-		undoStep(c1, s);
+	if(c1.x - c1.r < 0) {
+		c1.x = c1.r;
+		c1.vx *= -1+friction;
+		step(c1, s);
+	}
+	if(c1.y + c1.r > canvasHeight) {
+		c1.y = canvasHeight - c1.r;
+		c1.vy *= -1+friction;
+		step(c1, s);
+	}
+	if(c1.y - c1.r < 0) {
+		c1.y = c1.r;
 		c1.vy *= -1+friction;
 		step(c1, s);
 	}
