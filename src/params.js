@@ -1,0 +1,15 @@
+export const canvasWidth = 1000;
+export const canvasHeight = 800;
+export const circleCount = 20;
+export const circleSizeFactor = 1;
+export const initialVelocity = 10;
+export const terminalVelocity = 2;
+export const g = 0.0;
+export const energyLoss =  0.1;
+export const friction = 0.1;
+export const timestep = 0.02;
+export const minMass = 20;
+export const maxMass = 40;
+export const repulsionForce = 20;
+export const debug = false;
+export const backgroundColor = '#00000010'
